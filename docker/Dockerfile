@@ -4,6 +4,7 @@ MAINTAINER Fernando Cagua "fernando@cagua.co"
 
 # install additional packages
 RUN R -e "install.packages('Rcpp', repos='https://cran.rstudio.com/')"
+RUN R -e "install.packages('RColorBrewer', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('ggplot2', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('httr', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('jsonlite', repos='https://cran.rstudio.com/')"
@@ -22,7 +23,6 @@ RUN R -e "install.packages('plotly', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('leaflet', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('tm', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('wordcloud', repos='https://cran.rstudio.com/')"
-RUN R -e "install.packages('RColorBrewer', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('networkD3', repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages('flexdashboard', repos='https://cran.rstudio.com/')"
 
