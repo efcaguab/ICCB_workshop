@@ -1,0 +1,225 @@
+---
+title: "Conservation Insights"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: bootstrap
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include = FALSE}
+# non attached packages: httr, wordcloud, tm, RColorBrewer
+library(flexdashboard)
+library(plotly)
+library(rgdal)
+library(leaflet)
+library(magrittr)
+survey_id <- 89735
+data_dir <- file.path("./data", survey_id)
+dir.create(data_dir)
+
+# read data if it exists
+read_survey <- function(data_dir){
+	if(file.exists(file.path(data_dir, "survey.rds"))) 
+	readRDS(file.path(data_dir, "survey.rds"))
+}
+
+
+
+data <- reactiveValues(
+	survey = read_survey(data_dir),
+	countries = readOGR("./data/countries.geojson", "OGRGeoJSON")
+)
+
+observeEvent(data$countries, {
+	country_meta <- read.csv("./data/country_metadata.csv") %>% 
+		dplyr::mutate_all(as.character) %>%
+		dplyr::filter(!duplicated(sov_a3))
+	data$country_meta <- dplyr::data_frame(
+		sov_a3 = data$countries$adm0_a3, 
+		name = data$countries$name) %>% 
+		dplyr::left_join(country_meta) 
+})
+
+```
+
+
+```{r global, include = FALSE}
+
+
+# data$survey <- read_survey(data_dir)
+ext_top_data <- function(d, field) {
+	d %>% lapply(function(x) x[[field]]) %>% 
+		unlist() %>% trimws() %>% tolower()
+}
+
+
+
+```
+
+# Basic
+
+## Input {.sidebar}
+
+Waiting time between eruptions and the duration of the eruption for the
+Old Faithful geyser in Yellowstone National Park, Wyoming, USA.
+
+```{r}
+
+actionButton("update_data", "Update data")
+
+observeEvent(input$update_data, {
+	httr::GET("https://kc.kobotoolbox.org/api/v1/data/89735",
+						httr::authenticate("efcaguab", "DQe1csPKT14!")) %>%
+		httr::content() %>%
+		saveRDS(file.path(data_dir, "survey.rds"))
+	data$survey <- read_survey(data_dir)
+})
+
+# renderPrint(data$survey)
+```
+
+
+## Column {data-width=650}
+
+### Map 1
+
+```{r}
+renderLeaflet({
+	current_country <- ext_top_data(data$survey,
+																	"section_work/current_country") %>%
+		table() %>% as.data.frame.table() %>%
+		`names<-`(c("survey_name", "freq")) %>%
+		dplyr::right_join(data$country_meta)
+	current_country$freq[is.na(current_country$freq)] <- 0
+# data$countries$cur_country <- current_country$freq
+
+	pal <- colorBin("Blues", current_country$freq)
+	label <- sprintf(
+		"<strong>%s</strong><br/>%g attendants",
+		data$countries$name, current_country$freq
+	) %>% lapply(htmltools::HTML)
+
+	leaflet(data$countries, options = leafletOptions(minZoom = 1)) %>%
+		addProviderTiles(providers$Esri.WorldStreetMap)  %>%
+		addPolygons(fillColor = ~pal(current_country$freq), color = "grey",
+								weight = 1, opacity = 1, fillOpacity = 0.7,
+								highlight = highlightOptions(
+									weight = 1,
+									color = "black",
+									dashArray = "",
+									fillOpacity = 0.7,
+									bringToFront = TRUE),
+								label = label,
+								labelOptions = labelOptions(
+									style = list("font-weight" = "normal", padding = "3px 8px"),
+									textsize = "15px",
+									direction = "auto")) %>%
+		addLegend(pal = pal, values = ~current_country$freq, opacity = 0.7, title = NULL,
+							position = "bottomleft")
+})
+
+```
+
+
+### Map 2
+
+```{r}
+renderLeaflet({
+	old_country <- ext_top_data(data$survey,
+																	"section_countries") %>%
+		table() %>% as.data.frame.table() %>%
+		`names<-`(c("survey_name", "freq")) %>%
+		dplyr::right_join(data$country_meta)
+	old_country$freq[is.na(old_country$freq)] <- 0
+	# data$countries$old_country <- old_country$freq
+	# data$countries$old_country[is.na(data$countries$old_country)] <- 0
+
+	pal <- colorBin("Reds", old_country$freq)
+	label <- sprintf(
+		"<strong>%s</strong><br/>%g attendants",
+		data$countries$name, old_country$freq
+	) %>% lapply(htmltools::HTML)
+
+	leaflet(data$countries, options = leafletOptions(minZoom = 1)) %>%
+		addProviderTiles(providers$Esri.WorldStreetMap)  %>%
+		addPolygons(fillColor = ~pal(old_country$freq), color = "grey",
+								weight = 1, opacity = 1, fillOpacity = 0.7,
+								highlight = highlightOptions(
+									weight = 1,
+									color = "black",
+									dashArray = "",
+									fillOpacity = 0.7,
+									bringToFront = TRUE),
+								label = label,
+								labelOptions = labelOptions(
+									style = list("font-weight" = "normal", padding = "3px 8px"),
+									textsize = "15px",
+									direction = "auto")) %>%
+		addLegend(pal = pal, values = ~old_country$freq,
+							opacity = 0.7, title = NULL,
+							position = "bottomleft")
+})
+
+```
+
+
+## Column {data-width=350}
+
+### Jobs & disciplines
+
+```{r}
+networkD3::renderSankeyNetwork({
+	categ_2_disc <- ext_top_data(data$survey, "section_work/job_category") %>% 
+		as.data.frame() %>% `names<-`("category") %>%
+		dplyr::mutate(discipline = ext_top_data(data$survey, 
+																						"section_work/job_discipline")) 
+	
+	links <- table(categ_2_disc) %>% as.data.frame() %>% 
+		`names<-`(c("source_name", "target_name", "value")) %>%
+		dplyr::filter(value != 0)
+	nodes <- links %>% 
+		reshape2::melt(measure.vars = 1:2, value.name = "name") %>% 
+		dplyr::mutate(ID = 1:nrow(.) - 1) %>%
+		dplyr::select(ID, name)
+	links %<>%
+		dplyr::left_join(nodes, by = c("source_name" = "name")) %>%
+		dplyr::rename(source = ID) %>%
+		dplyr::left_join(nodes, by = c("target_name" = "name")) %>%
+		dplyr::rename(target = ID) 
+	networkD3::sankeyNetwork(links, nodes, Source = "source", Target =  "target", Value = "value", NodeID = "name", fontSize = 12, nodeWidth = 30)
+})
+
+```
+
+
+### Favourite animals
+
+```{r}
+wordcloud_rep <- repeatable(wordcloud::wordcloud)
+
+renderPlot({
+	ext_top_data(data$survey, "section_animal/animal_name") %>%
+		table() %>% {
+			wordcloud_rep(names(.), ., min.freq = 0, 
+										colors = RColorBrewer::brewer.pal(8, "Blues"))
+		}
+})
+```
+
+### Yeras of experience
+
+```{r}
+renderPlotly({
+	ext_top_data(data$survey, "section_work/years_conservation") %>% as.numeric() %>% as.data.frame() %>%
+		`names<-`("years working on conservation") %>%
+		plotly::plot_ly(x = ~ `years working on conservation`,
+										type = "histogram", autobinx = F,
+										xbins = list(start = 0.5, end = 10.5, size = 1))
+})
+
+```
+
+
+# Advanced
