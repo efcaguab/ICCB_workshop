@@ -26,6 +26,4 @@ RUN R -e "install.packages(c'RColorBrewer', repos='https://cran.rstudio.com/')
 RUN R -e "install.packages(c'networkD3', repos='https://cran.rstudio.com/')
 RUN R -e "install.packages(c'flexdashboard', repos='https://cran.rstudio.com/')
 
-, 'flexdashboard', 'rgdal', 'plotly', 'leaflet', 'magrittr', 'httr', 'wordcloud', 'tm', 'RColorBrewer', 'networkD3'))"
-
 CMD ["/usr/bin/shiny-server.sh"]
