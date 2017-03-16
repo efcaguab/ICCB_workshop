@@ -9,7 +9,7 @@ runtime: shiny
 ---
 
 ```{r setup, include = FALSE}
-# non attached packages: httr, wordcloud, tm, RColorBrewer
+# non attached packages: httr, wordcloud, tm, RColorBrewer, dplyr, networkD3
 library(flexdashboard)
 library(plotly)
 library(rgdal)
@@ -83,7 +83,7 @@ observeEvent(input$update_data, {
 
 ## Column {data-width=650}
 
-### Map 1
+### Current country
 
 ```{r}
 renderLeaflet({
@@ -123,7 +123,7 @@ renderLeaflet({
 ```
 
 
-### Map 2
+### Previous countries
 
 ```{r}
 renderLeaflet({
@@ -219,6 +219,45 @@ renderPlotly({
 										xbins = list(start = 0.5, end = 10.5, size = 1))
 })
 
+```
+
+## Widgets
+
+### favourite animals
+
+```{r}
+renderValueBox({
+	data$survey %>% 
+		ext_top_data("section_animal/animal_name") %>% 
+		dplyr::n_distinct() %>%
+		valueBox(icon = "fa-paw")
+})
+```
+
+### years of experience
+
+```{r}
+renderValueBox({
+	data$survey %>% 
+		ext_top_data("section_work/years_conservation") %>% 
+		as.numeric() %>%
+		sum() %>%
+		valueBox(icon = "fa-clock-o")
+})
+```
+
+### countries represented
+
+```{r}
+renderValueBox({
+	current_country <- ext_top_data(data$survey,
+																	"section_work/current_country")
+	old_country <- ext_top_data(data$survey,
+																	"section_countries")
+	c(current_country, old_country) %>%
+		dplyr::n_distinct() %>%
+		valueBox(icon = "fa-globe")
+})
 ```
 
 
